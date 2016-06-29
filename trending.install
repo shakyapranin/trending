@@ -1,0 +1,59 @@
+<?php
+module_load_include('inc','trending','trending.constants');
+function trending_schema(){
+    $schema = array();
+    $schema[TRENDING_MODULE_TABLE] = array(
+        'description' => 'The base table for tracking unique.',
+        'fields' => array(
+            'id' => array(
+                'description' => 'The primary identifier for a visitor table.',
+                'type' => 'serial',
+                'unsigned' => TRUE,
+                'not null' => TRUE,
+            ),
+            'entity_type' => array(
+                'description' => 'The entity type of this entity.',
+                'type' => 'varchar',
+                'length' => 32,
+                'not null' => TRUE,
+                'default' => '',
+            ),
+            'bundle' => array(
+                'description' => 'The bundle of this entity.',
+                'type' => 'varchar',
+                'length' => 32,
+                'not null' => TRUE,
+                'default' => '',
+            ),
+            'item_id' => array(
+                'description' => 'Item identifier.',
+                'type' => 'int',
+                'unsigned' => TRUE,
+                'not null' => TRUE,
+                'default' => 0,
+            ),
+            'expiry_time' => array(
+                'description' => 'Unix timestamp expiry time.',
+                'type' => 'int',
+                'not null' => TRUE,
+                'default' => 0,
+            ),
+            'visitor_ip' => array(
+                'description' => 'The ip of visitor.',
+                'type' => 'varchar',
+                'length' => 15,
+                'not null' => TRUE,
+                'default' => '',
+            ),
+        ),
+        'primary key' => array('id'),
+    );
+    return $schema;
+}
+
+/**
+ * Remove table on module uninstall
+ */
+function trending_uninstall(){
+    drupal_uninstall_schema(TRENDING_MODULE);
+}

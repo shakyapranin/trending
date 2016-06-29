@@ -1,0 +1,9 @@
+name = Trending
+description = Provides trending items
+core = 7.x
+files[] = trending.module
+files[] = trending.install
+files[] = trending.constants.inc
+files[] = trending.admin.inc
+
+author = Pranin Shakya

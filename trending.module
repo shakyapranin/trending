@@ -1,0 +1,204 @@
+<?php
+
+module_load_include('inc', 'trending', 'trending.constants');
+
+/**
+ * Implements hook_help().
+ */
+function trending_help($path, $arg)
+{
+
+}
+
+
+/**
+ * @param $params
+ * Function to calculate unique visitors respecting time frame (Identity regeneration period)
+ */
+function trending_visit($params)
+{
+    $status = '';// Possible values are : 'old_expired', 'old', 'new'
+
+    // Initialize new expiry time as per settings
+    $params['new_expiry_time'] = strtotime('+'.variable_get('identity_expiry_period','0').' days',time());
+    $is_old = check_if_visitor_is_old($params);// This will hold expiry time if true;
+    // Logic to trigger post visit and update expiry visit time
+
+    // If visitor is old update the information
+    if($is_old){
+        /*IS OLD VISITOR*/
+        $status = 'old';
+        if(intval($is_old['expiry_time'])<time()){
+            /*IS OLD VISITOR WHO'S EXPIRY TIME HAS PASSED*/
+            // If expiry period has not exceeded add the new expiry time
+            update_visitor_information($params);
+            $status = 'old_expired';
+        }
+    }else{
+        /*NEW VISITOR*/
+        $status = 'new';
+        create_visitor_information($params);
+    }
+    return $status;
+
+    // Logic to trigger post visit and update expiry visit time
+
+}
+
+/**
+ * Implements hook_menu().
+ */
+function trending_menu()
+{
+    $items = array();
+    $items['admin/config/settings/trending'] = array(
+        'title' => t('Adminster Trending module.'),
+        'description' => t('Configurations for trending module.'),
+        'page callback' => 'drupal_get_form',
+        'page arguments' => array('trending_settings_form'),
+        'access callback' => true,
+        'file' => 'trending.admin.inc',
+    );
+    return $items;
+}
+
+
+/**
+ * @param $expiryTime
+ * @param $currentTime
+ * @return bool
+ */
+function is_expired($expiryTime, $currentTime)
+{
+    if ($currentTime > $expiryTime) {
+        return true;
+    } else {
+        return false;
+    }
+}
+
+
+/**
+ * @param $visitor_ip
+ * Function to check if visitor is new
+ */
+function check_if_visitor_is_old($params)
+{
+    $table = TRENDING_MODULE_TABLE;
+    $visitor = false;
+    try{
+        $visitor = db_select($table, 'v')
+            ->fields('v', array('expiry_time'))
+            ->condition('visitor_ip',$params['visitor_ip'])
+            ->condition('entity_type',$params['entity_type'])
+            ->condition('bundle',$params['bundle'])
+            ->condition('item_id',$params['item_id'])
+            ->execute()
+            ->fetchAssoc();
+    }catch (Exception $e){
+        watchdog(TRENDING_MODULE,'Select query exception',array(),WATCHDOG_ERROR,NULL);
+    }
+
+    if($visitor){
+        return $visitor;
+    }else{
+        return false;
+    }
+}
+
+
+/**
+ * Implements hook_init().
+ */
+function trending_init()
+{
+/*    $params['visitor_ip'] = '192.168.10.1';
+    $params['entity_type'] = 'product';
+    $params['bundle'] = 'product';
+    $params['item_id'] = '0';
+
+    $params['visitor_ip'] = '192.168.10.1';
+    $params['entity_type'] = 'product';
+    $params['bundle'] = 'product';
+    $params['item_id'] = '2';
+    trending_visit($params);*/
+}
+
+
+/**
+ * @param $params
+ *
+ * Update visitor information
+ */
+function update_visitor_information($params){
+    $updateFlag = false;
+    try{
+        $updateFlag = db_update(TRENDING_MODULE_TABLE)
+            ->fields(array(
+                'expiry_time' => $params['new_expiry_time']
+            ))
+            ->condition('visitor_ip',$params['visitor_ip'])
+            ->condition('entity_type',$params['entity_type'])
+            ->condition('bundle',$params['bundle'])
+            ->condition('item_id',$params['item_id'])
+            ->execute();
+    }catch (Exception $e){
+        watchdog(TRENDING_MODULE,'Update query exception.',array(),WATCHDOG_ERROR,NULL);
+    }
+
+    return $updateFlag;
+}
+
+/**
+ * @param $params
+ * @return DatabaseStatementInterface|int
+ * @throws Exception
+ * Create new visitor entry
+ */
+function create_visitor_information($params){
+    $createFlag = false;
+    try{
+        $createFlag = db_insert(TRENDING_MODULE_TABLE)
+            ->fields(
+                array(
+                    'entity_type' => $params['entity_type'],
+                    'bundle' => $params['bundle'],
+                    'item_id' => $params['item_id'],
+                    'visitor_ip' => $params['visitor_ip'],
+                    'expiry_time' => strtotime('+'.variable_get('identity_expiry_period','0').' days',time()),
+                )
+            )
+            ->execute();
+    }catch (Exception $e){
+        watchdog(TRENDING_MODULE,'Insert query exception.',array(),WATCHDOG_ERROR,NULL);
+    }
+
+    return $createFlag;
+}
+
+
+/**
+ * @return mixed
+ * Get IP address of user connection
+ */
+function get_user_ip()
+{
+    $client  = @$_SERVER['HTTP_CLIENT_IP'];
+    $forward = @$_SERVER['HTTP_X_FORWARDED_FOR'];
+    $remote  = $_SERVER['REMOTE_ADDR'];
+
+    if(filter_var($client, FILTER_VALIDATE_IP))
+    {
+        $ip = $client;
+    }
+    elseif(filter_var($forward, FILTER_VALIDATE_IP))
+    {
+        $ip = $forward;
+    }
+    else
+    {
+        $ip = $remote;
+    }
+
+    return $ip;
+}
